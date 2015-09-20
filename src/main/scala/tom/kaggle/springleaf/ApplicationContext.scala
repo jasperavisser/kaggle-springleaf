@@ -1,36 +1,26 @@
 package tom.kaggle.springleaf
 
-import java.io.File
-
 import com.redis.RedisClient
 import com.typesafe.config.ConfigFactory
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.{SparkConf, SparkContext}
+import scaldi.{Injectable, Injector}
 import tom.kaggle.springleaf.analysis._
 
-class ApplicationContext(configFilePath: String) {
-  val conf = new SparkConf()
-    .setAppName("Kaggle Springleaf")
-    .setMaster("local[*]")
-    .set("spark.executor.memory", "8g")
-    .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-  val sc = new SparkContext(conf)
-  val ONE_GB = 1024 * 1024 * 1024
-  sc.hadoopConfiguration.setInt("parquet.block.size", ONE_GB)
+class ApplicationContext(implicit injector: Injector) extends Injectable {
 
-  val sqlContext = new SQLContext(sc)
+  val sc = inject[SparkContext]
+  val sqlContext = inject[SQLContext]
+  val redis = inject[RedisClient]
+  val statistics = inject[DataStatistics]
+  val fraction = inject[Double]("fraction")
 
-  val config = ConfigFactory.parseFile(new File(configFilePath))
+  val config = ConfigFactory.load()
   val dataFolderPath = config.getString("data.folder")
-  val fraction = config.getDouble("fraction")
   val trainFeatureVectorPath = dataFolderPath + "/train-feature-vector" + fraction
-  val cachedInferrededTypesPath = dataFolderPath + "/predicted-types"
+  val cachedInferredTypesPath = dataFolderPath + "/predicted-types"
 
   val dataImporter = new DataImporter(dataFolderPath, fraction, sc, sqlContext)
-
-  val redisHost = config.getString("redis.host")
-  val redisPort = config.getInt("redis.port")
-  val redis = new RedisClient(redisHost, redisPort)
 
   val df = {
     val result = dataImporter.readSample
@@ -39,8 +29,6 @@ class ApplicationContext(configFilePath: String) {
   }
 
   val typeInference = new ColumnTypeInference
-  val statistics = new DataStatistics(sqlContext, ApplicationContext.tableName)
-  val cachedAnalysis: ICachedAnalysis = RedisCacheAnalysis(this, statistics)
 }
 
 object ApplicationContext {

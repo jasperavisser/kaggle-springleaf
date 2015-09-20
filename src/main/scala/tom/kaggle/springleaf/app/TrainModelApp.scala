@@ -42,10 +42,9 @@ case class TrainModelApp(ac: ApplicationContext) {
 
 object TrainModelApp {
   def main(args: Array[String]) {
-    val configFilePath = if (args.length == 0) "application.conf" else args(0)
-    val ac = new ApplicationContext(configFilePath)
-    val app = TrainModelApp(ac)
-    app.run()
+//    val ac = new ApplicationContext()
+//    val app = TrainModelApp(ac)
+//    app.run()
   }
 
 }

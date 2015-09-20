@@ -3,14 +3,14 @@ package tom.kaggle.springleaf.app
 import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 
 import org.apache.spark.sql.types.DataType
+import scaldi.{Injectable, TypesafeConfigInjector}
+import tom.kaggle.springleaf.analysis.RedisCacheAnalysis
 import tom.kaggle.springleaf.ml.FeatureVectorCreator
-import tom.kaggle.springleaf.{ApplicationContext, SchemaInspector, SqlDataTypeTransformer}
+import tom.kaggle.springleaf.{ApplicationContext, SchemaInspector, SpringLeafModule, SqlDataTypeTransformer}
 
-case class AnalyzeDataApp(ac: ApplicationContext) {
+class AnalyzeDataApp(ac: ApplicationContext, cacheAnalysis: RedisCacheAnalysis) {
 
-  def run() {
-    analyzeCategoricalVariables()
-  }
+  def run() = analyzeCategoricalVariables()
 
   private def analyzeCategoricalVariables() {
     val df = ac.df
@@ -20,7 +20,7 @@ case class AnalyzeDataApp(ac: ApplicationContext) {
       readInferredTypes().getOrElse {
         val categoricalVariables = schemaInspector.getCategoricalVariables
         println("%d number of categoricalVariables".format(categoricalVariables.length))
-        val columnValues = ac.cachedAnalysis.analyze(categoricalVariables)
+        val columnValues = cacheAnalysis.analyze(categoricalVariables)
         val inferredTypes = ac.typeInference.inferTypes(columnValues)
         inferredTypes.foreach {
           case (column, dataType) => println(s"Inferred type ${dataType.typeName} for column $column")
@@ -55,7 +55,7 @@ case class AnalyzeDataApp(ac: ApplicationContext) {
   }
 
   private def saveInferredTypes(inferredTypes: Map[String, DataType]) {
-    val outputFile = new File(ac.cachedInferrededTypesPath)
+    val outputFile = new File(ac.cachedInferredTypesPath)
     if (outputFile.exists()) outputFile.delete()
     val writer = new PrintWriter(new BufferedWriter(new FileWriter(outputFile)))
     inferredTypes.foreach { case (column, inferredType) => writer.println(s"$column = ${inferredType.json}") }
@@ -63,7 +63,7 @@ case class AnalyzeDataApp(ac: ApplicationContext) {
   }
 
   private def readInferredTypes(): Option[Map[String, DataType]] = {
-    val file = new File(ac.cachedInferrededTypesPath)
+    val file = new File(ac.cachedInferredTypesPath)
     if (file.exists()) {
       val lines = scala.io.Source.fromFile(file).getLines()
       val map: Map[String, DataType] = lines.map { line =>
@@ -76,12 +76,10 @@ case class AnalyzeDataApp(ac: ApplicationContext) {
   }
 }
 
-object AnalyzeDataApp {
-  def main(args: Array[String]) {
-    val configFilePath = if (args.length == 0) "application.conf" else args(0)
-    val ac = new ApplicationContext(configFilePath)
-    val app = AnalyzeDataApp(ac)
-    app.run()
-  }
+object AnalyzeDataApp extends Injectable {
 
+  def main(args: Array[String]) {
+    implicit val injector = TypesafeConfigInjector() :: new SpringLeafModule
+    inject[AnalyzeDataApp].run()
+  }
 }

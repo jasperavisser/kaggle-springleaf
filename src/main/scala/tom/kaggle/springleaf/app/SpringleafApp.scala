@@ -1,12 +1,12 @@
 package tom.kaggle.springleaf.app
 
+import scaldi.{Injector, Injectable}
 import tom.kaggle.springleaf.{ApplicationContext, DataPreProcessor}
 
-object SpringleafApp {
+object SpringleafApp extends Injectable {
 
-  def main(args: Array[String]) {
-    val configFilePath = if (args.length == 0) "application.conf" else args(0)
-    val ac = new ApplicationContext(configFilePath)
+  def main(args: Array[String])(implicit injector: Injector) {
+    val ac = new ApplicationContext()
 
     val startTime = System.currentTimeMillis()
     val endReadTime = System.currentTimeMillis()
@@ -59,7 +59,7 @@ object SpringleafApp {
     val dataPreProcessor = DataPreProcessor(ac)
 
     val (indDf, indexedNames) = dataPreProcessor.transformCategoricalToIndexed
-    
+
 
     indDf.printSchema()
     indDf.registerTempTable("yyy")
